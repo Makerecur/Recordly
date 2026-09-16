@@ -36,32 +36,30 @@ function normalizeEvenDimension(value: number): number {
 }
 
 /**
- * Ceiling for the export canvas that the quality tiers scale from.
+ * Pixel budget for the export canvas that the quality tiers scale from.
  *
  * "Original" follows the source, and a full-screen capture of a 5K panel at backing
  * scale 2 is 5120 x 2880. For a 9:16 export that produced a 2880 x 5120 canvas:
  * 14.7 megapixels read back per frame and taller than H.264 hardware encoders accept,
- * so the export stalled or failed. Capping the canvas at 4K UHD (3840 on the long side,
- * 2160 on the short side) keeps the largest tier encodable and every lower tier scales
- * from the capped canvas. Sources at or below 4K are unaffected.
+ * so the export stalled or failed. Capping the canvas at the area of 4K UHD keeps the
+ * largest tier encodable and every lower tier scales from the capped canvas, while a
+ * wide or tall source under that area (an ultrawide, for example) keeps its size.
+ * Sources at or below 4K UHD are unaffected.
  */
-export const MAX_EXPORT_LONG_SIDE = 3840;
-export const MAX_EXPORT_SHORT_SIDE = 2160;
+export const MAX_EXPORT_CANVAS_PIXELS = 3840 * 2160;
 
 export function capExportCanvasDimensions(
 	width: number,
 	height: number,
-	maxLongSide: number = MAX_EXPORT_LONG_SIDE,
-	maxShortSide: number = MAX_EXPORT_SHORT_SIDE,
+	maxPixels: number = MAX_EXPORT_CANVAS_PIXELS,
 ): { width: number; height: number } {
-	const longSide = Math.max(width, height);
-	const shortSide = Math.min(width, height);
-	const scale = Math.min(1, maxLongSide / longSide, maxShortSide / shortSide);
+	const pixels = width * height;
 
-	if (!Number.isFinite(scale) || scale >= 1) {
+	if (!Number.isFinite(pixels) || pixels <= 0 || pixels <= maxPixels) {
 		return { width: normalizeEvenDimension(width), height: normalizeEvenDimension(height) };
 	}
 
+	const scale = Math.sqrt(maxPixels / pixels);
 	return {
 		width: normalizeEvenDimension(width * scale),
 		height: normalizeEvenDimension(height * scale),

@@ -73,15 +73,27 @@ describe("calculateMp4SourceDimensions", () => {
 		});
 	});
 
-	it("applies the cap after native crop bounds", () => {
+	it("leaves a native crop of a 5K capture alone once it fits the budget", () => {
 		expect(
 			calculateMp4SourceDimensions(5120, 2880, "native", {
 				width: 0.5,
 				height: 1,
 			}),
 		).toEqual({
-			width: 2160,
-			height: 2430,
+			width: 2560,
+			height: 2880,
+		});
+	});
+
+	it("scales a native crop of a 5K capture that still exceeds the budget", () => {
+		expect(
+			calculateMp4SourceDimensions(5120, 2880, "native", {
+				width: 0.8,
+				height: 1,
+			}),
+		).toEqual({
+			width: 3434,
+			height: 2414,
 		});
 	});
 
@@ -103,17 +115,37 @@ describe("capExportCanvasDimensions", () => {
 		expect(capExportCanvasDimensions(2160, 3840)).toEqual({ width: 2160, height: 3840 });
 	});
 
-	it("scales an ultrawide source down to the long-side ceiling", () => {
-		expect(capExportCanvasDimensions(5120, 2160)).toEqual({ width: 3840, height: 1620 });
+	it("leaves an ultrawide source inside the budget at its own size", () => {
+		expect(capExportCanvasDimensions(5120, 1440)).toEqual({ width: 5120, height: 1440 });
 	});
 
-	it("scales a 5K source down to the short-side ceiling", () => {
+	it("scales an ultrawide source above the budget by area, keeping its shape", () => {
+		expect(capExportCanvasDimensions(5120, 2160)).toEqual({ width: 4434, height: 1870 });
+	});
+
+	it("scales a 5K source down to the 4K UHD pixel budget", () => {
 		expect(capExportCanvasDimensions(5120, 2880)).toEqual({ width: 3840, height: 2160 });
 		expect(capExportCanvasDimensions(2880, 5120)).toEqual({ width: 2160, height: 3840 });
 	});
 
-	it("honours a custom ceiling", () => {
-		expect(capExportCanvasDimensions(2880, 5120, 2560, 1440)).toEqual({
+	it("never exceeds the budget after rounding to even dimensions", () => {
+		for (const [width, height] of [
+			[5120, 2880],
+			[6016, 3384],
+			[5120, 2160],
+			[7680, 4320],
+			[2880, 5120],
+			[3441, 1441],
+		]) {
+			const capped = capExportCanvasDimensions(width, height);
+			expect(capped.width * capped.height).toBeLessThanOrEqual(3840 * 2160);
+			expect(capped.width % 2).toBe(0);
+			expect(capped.height % 2).toBe(0);
+		}
+	});
+
+	it("honours a custom budget", () => {
+		expect(capExportCanvasDimensions(2880, 5120, 2560 * 1440)).toEqual({
 			width: 1440,
 			height: 2560,
 		});
